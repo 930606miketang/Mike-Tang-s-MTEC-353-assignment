@@ -1,7 +1,7 @@
 # Week 1 Process Journal
 
 **Name:** Mike Tang  
-**Email:** matng2@berklee.edu  
+**Email:** mtang2@berklee.edu  
 **Date:** 9/16/2026  
 
 ## Gemini Prompt & Code
