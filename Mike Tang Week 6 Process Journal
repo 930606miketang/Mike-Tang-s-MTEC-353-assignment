@@ -1,0 +1,74 @@
+# Week 6 Process Journal: JUCE Audio File Operations
+
+## Overview
+
+* **Topic**: JUCE Audio File Input/Output (I/O) Operations and Memory Management.
+* **Learning Objectives**:
+  * Trace and explain the JUCE audio file I/O workflow.
+  * Understand the collaboration between `juce::File`, `juce::AudioFormatManager`, `juce::AudioFormatReader`, and `juce::AudioBuffer`.
+  * Predict and verify the effects of potential code modifications (e.g., buffer allocation, read/write parameter adjustments).
+
+---
+
+## 🔍 Phase 1: Workflow Mapping
+
+In the `01.AudioFileInfo` exercise, we mapped out the complete data flow and core objects from a file path to reading audio metadata:
+
+### 1. Core Objects & Fill-in-the-Blanks
+
+1. **`juce::File`**: Object representing the file on disk.
+2. **`juce::AudioFormatManager`**: Manages different audio formats (WAV, AIFF, etc.).
+3. **`juce::AudioFormatReader`**: Reads audio data and provides file information.
+4. **`std::unique_ptr`**: Used for automatic memory management (RAII principle).
+5. **`if (reader)` check**: Ensures the reader pointer is valid to prevent crashes if the file fails to open or format is unsupported.
+
+### 2. Data Flow
+
+$$\text{File path} \longrightarrow \text{juce::File} \longrightarrow \text{AudioFormatManager / Reader} \longrightarrow \text{Audio Information}$$
+
+---
+
+## Phase 2: Predict-Modify-Verify
+
+Analyzing the implementation code in `02.ReadWriteAudioFile` to evaluate memory allocation and streaming behavior.
+
+### 1. Buffer Memory Allocation Analysis
+
+* **Code Snippet**:
+
+  ```cpp
+  juce::AudioBuffer<float> buffer(reader->numChannels, static_cast<int>(reader->lengthInSamples));
+  ```
+
+* **Scenario Prediction**: What happens if the source file is 5 minutes long at 48kHz? Will this work?
+  * **Calculation**: $5 \text{ min} \times 60 \text{ s/min} \times 48,000 \text{ Hz} = 14,400,000 \text{ samples}$.
+  * **Result**: For a stereo file, this allocates around 28.8 million `float` variables (approx. 110 MB of memory). While this works fine on modern desktop machines, loading an entire long audio file into an in-memory buffer all at once is not a best practice for real-time audio or large-scale applications; chunk-based streaming should be used instead.
+
+### 2. `reader->read()` Parameter Adjustment Prediction
+
+* **Original Code**:
+
+  ```cpp
+  reader->read(&buffer, 0, static_cast<int>(reader->lengthInSamples), 0, true, true);
+  ```
+
+* **Predicted Modification**: What happens if we change the last two parameters from `true, true` to `false, false`?
+  * **Parameter Meaning**: In JUCE's `read` function, these flags control whether to clear the destination buffer and whether to perform advanced sample rate conversion / interleave handling.
+  * **Impact**: Setting them to `false` might leave residual garbage data in the buffer prior to writing. If the read sample count is smaller than the buffer size, this leftover noise can corrupt the audio output.
+
+---
+
+## Phase 3: Teach-Back Check
+
+Consolidating our understanding of the JUCE audio architecture through peer Q&A:
+
+1. **What's the purpose of `AudioFormatManager`?**
+   * It acts as a central registry that manages and recognizes various audio format decoders (like WAV, AIFF), automatically instantiating the correct `AudioFormatReader` or `AudioFormatWriter` based on file extensions.
+2. **Why do we check `if (reader)` before using it?**
+   * Because if the file path is invalid, corrupted, or unsupported, `formatManager.createReaderFor()` returns a `nullptr`. Dereferencing it without validation will cause a segmentation fault and crash the program.
+3. **What does `AudioBuffer` hold?**
+   * It holds an efficient, multi-channel floating-point array of audio samples stored in a non-interleaved format (each channel has its own contiguous block of memory), specifically designed for DSP operations.
+4. **What's the difference between reading and writing audio files in JUCE?**
+   * **Reading**: Requires an `AudioFormatReader` to pull samples from disk and an `AudioBuffer` to store them in memory.
+   * **Writing**: Requires an `AudioFormatWriter` (created via `createWriterFor` from an audio format instance) to push data from an `AudioBuffer` through an output stream back to disk, specifying details like bit depth (e.g., 16-bit).
+  
