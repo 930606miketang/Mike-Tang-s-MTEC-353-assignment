@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "name": "macOS",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/JUCE/modules"
+            ],
+            "compilerPath": "/usr/bin/clang++",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
